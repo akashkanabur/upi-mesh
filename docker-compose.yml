@@ -1,0 +1,7 @@
+services:
+  upi-mesh:
+    build: .
+    container_name: upi-mesh-app
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
