@@ -37,7 +37,7 @@ import java.util.Base64;
  * causes decryption to fail with an exception. This is what makes it safe for
  * untrusted intermediates to hold.
  */
-@Service
+@Service // Registers this class in spring managed service
 public class HybridCryptoService {
 
     private static final String RSA_TRANSFORMATION = "RSA/ECB/OAEPWithSHA-256AndMGF1Padding";
@@ -47,8 +47,8 @@ public class HybridCryptoService {
     private static final int GCM_TAG_BITS = 128;
     private static final int RSA_ENCRYPTED_KEY_BYTES = 256; // for 2048-bit RSA
 
-    private final SecureRandom rng = new SecureRandom();
-    private final ObjectMapper json = new ObjectMapper();
+    private final SecureRandom rng = new SecureRandom();   // Generates random bytes for the AES-GCM IV
+    private final ObjectMapper json = new ObjectMapper(); // Converts java objects to and from JSON objects
 
     @Autowired
     private ServerKeyHolder serverKey;
@@ -61,31 +61,31 @@ public class HybridCryptoService {
         byte[] plaintext = json.writeValueAsBytes(instruction);
 
         // 1. Generate a one-time AES key for this packet.
-        KeyGenerator kg = KeyGenerator.getInstance("AES");
+        KeyGenerator kg = KeyGenerator.getInstance("AES"); // Generates a fresh 256-bit AES key
         kg.init(AES_KEY_BITS);
         SecretKey aesKey = kg.generateKey();
 
         // 2. AES-GCM encrypt the payload.
         byte[] iv = new byte[GCM_IV_BYTES];
         rng.nextBytes(iv);
-        Cipher aes = Cipher.getInstance(AES_TRANSFORMATION);
-        aes.init(Cipher.ENCRYPT_MODE, aesKey, new GCMParameterSpec(GCM_TAG_BITS, iv));
+        Cipher aes = Cipher.getInstance(AES_TRANSFORMATION); //Performs encryption and decryption operations
+        aes.init(Cipher.ENCRYPT_MODE, aesKey, new GCMParameterSpec(GCM_TAG_BITS, iv)); //Configures the GCM authentication tag length and IV
         byte[] aesCiphertext = aes.doFinal(plaintext);
 
         // 3. RSA-OAEP encrypt the AES key with the server's public key.
         Cipher rsa = Cipher.getInstance(RSA_TRANSFORMATION);
         OAEPParameterSpec oaep = new OAEPParameterSpec(
-                "SHA-256", "MGF1", MGF1ParameterSpec.SHA256, PSource.PSpecified.DEFAULT);
+                "SHA-256", "MGF1", MGF1ParameterSpec.SHA256, PSource.PSpecified.DEFAULT);//Explicitly configures RSA-OAEP with SHA-256 and MGF1-SHA-256.
         rsa.init(Cipher.ENCRYPT_MODE, serverPublicKey, oaep);
         byte[] encryptedAesKey = rsa.doFinal(aesKey.getEncoded());
 
         // 4. Pack: [encrypted AES key][IV][AES ciphertext + tag]
-        ByteBuffer buf = ByteBuffer.allocate(encryptedAesKey.length + iv.length + aesCiphertext.length);
+        ByteBuffer buf = ByteBuffer.allocate(encryptedAesKey.length + iv.length + aesCiphertext.length);//Combines or separates the encrypted key, IV, and ciphertext
         buf.put(encryptedAesKey);
         buf.put(iv);
         buf.put(aesCiphertext);
 
-        return Base64.getEncoder().encodeToString(buf.array());
+        return Base64.getEncoder().encodeToString(buf.array());//Encodes the combined binary packet as a string
     }
 
     /**
